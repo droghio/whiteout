@@ -1,0 +1,27 @@
+body, html {
+    padding: 0px;
+    margin: 0px;
+    font-family: arial;
+    background-color: #eee;
+}
+
+main {
+    width: 500px;
+    text-align: center;
+    margin-left: calc(50vw - 250px - 1em);
+    margin-top: max(calc(40vh - 125px - 1em), 1em);
+    border: 1px solid gray;
+    padding: 1em;
+    background-color: white;
+}
+
+canvas {
+    background: white;
+    border: 1px solid gray;
+    height: 300px;
+    width: calc(500px + 2em);
+    position: absolute;
+    top: calc(50vh);
+    left: calc(50vw - 250px - 1em);
+    z-index: -1;
+}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="css/style.css"></link>
+    </head>
+    <body>
+        <main>
+            <h1>Noise Generator</h1>
+            <p> This utility generates white noise. Press the play button to begin playing, and the pause button to stop. Use the gain adjust slider to change the volume of the output.
+            </p>
+            <div id="control-container">
+                <label for="gain">Gain: </label>
+                <input id="gain" onchange="update_volume(this)" type="range" min="1" max="100" value="10"></input>
+                <br />
+                <button id="play" onclick="resume_playing()">&#x25b6;</button>
+                <button id="pause" onclick="stop_playing()">&#x25a0;</button>
+            </div>
+            <canvas id="spectrum" width=500 height=300></canvas>
+        </main>
+    
+        <script type="text/javascript" src="js/index.js"></script>
+    </body>
+</html>
