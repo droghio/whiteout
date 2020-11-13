@@ -1,20 +1,51 @@
 //
+// Generates white noise and a preview spectrogram
+// 
+// Based on demonstration scripts provided by MDN:
+//    https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Visualizations_with_Web_Audio_API
+//    https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/createBufferSource
+//
+// Filter coefficients generated with:
+//    http://t-filter.engineerjs.com/
+
+
+//
 // Settings
 //
 
 const SECONDS_TO_MS = 1000
 
 const settings = {
-    segment_duration_seconds: 2,
-    segment_transition_ms: -10,
+    segment_duration_seconds: 1.5,
+    segment_transition_ms: 10,
     num_channels: 2,
-    volume_range: 10
+    volume_range: 10,
+    filter_options: {
+        lowpass_40db: [
+            0.06937509032995388,
+            0.2550350566225787,
+            0.3722292761889041,
+            0.2550350566225787,
+            0.06937509032995388
+        ],
+        unity: [1]
+    },
+    spectrogram: {
+        width: 500,
+        height: 300,
+        background_color: "rgba(0, 0, 0)",
+        bar_color: "rgb(0, 128, 0)",
+        fft_size: 128
+    }
 }
 
-let state = {
-    audio_context: undefined,
+const state = {
     playing_audio: false,
-    gain: 1
+    audio_context: undefined,
+    analyzer: undefined,
+    filter: undefined,
+    filter_coefficients: settings.filter_options.lowpass_40db,
+    gain: 1,
 }
 
 
@@ -40,7 +71,7 @@ const generate_white_noise_segment = (state, settings) => {
 const play_segment = (buffer, state, settings, callback) => {
     let audio_source = state.audio_context.createBufferSource()
     audio_source.buffer = buffer
-    audio_source.connect(state.analyzer)
+    audio_source.connect(state.filter)
     audio_source.start()
     setTimeout(callback, state.segment_duration_seconds*SECONDS_TO_MS-settings.segment_transition_ms)
 }
@@ -59,42 +90,58 @@ const generate_audio_context = (state) => {
 // Spectrogram Generation
 //
 
-const init_spectrogram = (state, canvasCtx) => {
-    WIDTH = 500
-    HEIGHT = 300
-
-    var analyser = state.audio_context.createAnalyser();
-    analyser.fftSize = 256;
-    var bufferLength = analyser.frequencyBinCount;
-    console.log(bufferLength);
-    var dataArray = new Uint8Array(bufferLength);
-    var barWidth = (WIDTH / bufferLength) * 2.5;
-    var barHeight;
-    canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
-
-    function draw() {
-        var x = 0;
-      drawVisual = requestAnimationFrame(draw);
-      analyser.getByteFrequencyData(dataArray);
-      canvasCtx.fillStyle = 'rgb(0, 0, 0)';
-      canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
-      for(var i = 0; i < bufferLength; i++) {
-        barHeight = dataArray[i]/2;
-        canvasCtx.fillStyle = 'rgb(' + (barHeight+100) + ',50,50)';
-        canvasCtx.fillRect(x,HEIGHT-barHeight/2,barWidth,barHeight);
-        x += barWidth + 1;
-      }
-    };
-
-    state.analyzer = analyser
+const init_spectrogram = (state, ctx) => {
+    state.analyzer = state.audio_context.createAnalyser()
     state.analyzer.connect(state.audio_context.destination)
+    state.analyzer.fftSize = settings.spectrogram.fft_size
+
+    const buffer_length = state.analyzer.frequencyBinCount
+    const fft_frame = new Uint8Array(buffer_length)
+    const bar_width = settings.spectrogram.width / buffer_length - 1
+    ctx.clearRect(0, 0, settings.spectrogram.width, settings.spectrogram.height)
+
+    const draw = _ => {
+        requestAnimationFrame(draw)
+        state.analyzer.getByteFrequencyData(fft_frame)
+        ctx.fillStyle = settings.spectrogram.background_color
+        ctx.fillRect(0, 0, settings.spectrogram.width, settings.spectrogram.height)
+        for(let i = 0; i < buffer_length; i++) {
+            // Normalize against max buffer value (256) and the canvas height.
+            let bar_height = settings.spectrogram.height*fft_frame[i]/256
+            ctx.fillStyle = settings.spectrogram.bar_color
+            ctx.fillRect(i*(bar_width+1), settings.spectrogram.height-bar_height, bar_width, bar_height)
+        }
+    }
     draw()
+}
+
+//
+// Filter Generation
+//
+
+const refresh_filter_options = (settings, target) => {
+    Object.keys(settings.filter_options).forEach((option) => {
+        console.log(`Found filter: ${option}`)
+        target[target.length] = new Option(option, option)
+    })
+}
+
+const init_filter = (state, settings, target) => {
+    refresh_filter_options(settings, target)
+    state.filter = state.audio_context.createIIRFilter(state.filter_coefficients, [1])
+    state.filter.connect(state.analyzer)
 }
 
 
 //
 // UI Events
 //
+
+const update_filter = (target) => {
+    console.log(target.value)
+    state.filter = state.audio_context.createIIRFilter(settings.filter_options[target.value], [1])
+    state.filter.connect(state.analyzer)
+}
 
 const update_volume = (target) => {
     state.gain = 2**((target.value-target.max)*settings.volume_range/target.max)
@@ -124,6 +171,7 @@ const stop_playing = _ => {
 const init = (state) => {
     generate_audio_context(state)
     init_spectrogram(state, document.getElementById("spectrum").getContext("2d"))
+    init_filter(state, settings, document.getElementById("filter"))
     update_volume(document.getElementById("gain"))
 }
 
